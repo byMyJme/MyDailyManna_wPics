@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>Today’s Manna</title>
+  <title>Daily Bible Verse</title>
   <style>
     :root { --pad: 16px; }
 
@@ -96,7 +96,7 @@
 </head>
 <body>
   <header>
-    <h2>Today’s Manna</h2>
+    <h2>Today's Verse</h2>
     <p id="verse">Loading...</p>
     <div class="ref" id="reference"></div>
     <div class="error" id="error"></div>
@@ -116,42 +116,27 @@
     const IMAGE_PREFIX = 'image_';
     const IMAGE_EXT = '.jpg';             // change if you use .png, etc.
 
-    let order = [];       // shuffled indices, e.g. [7, 3, 15, ...]
-    let cursor = 0;       // where we are in the shuffled list
+    // currentIndex always moves: 1 → 2 → … → TOTAL_IMAGES → 1 → …
+    let currentIndex = 1;
     let timerId = null;
 
     // Respect reduced motion settings
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Fisher–Yates shuffle
-    function shuffle(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return arr;
-    }
-
-    function newOrder() {
-      order = shuffle(Array.from({ length: TOTAL_IMAGES }, (_, i) => i + 1));
-      cursor = 0;
-    }
-
-    function nextFromOrder() {
-      if (order.length === 0 || cursor >= order.length) newOrder();
-      return order[cursor++];
-    }
-
-    function pickNextImage() {
-      const i = nextFromOrder();
+    function indexToSrc(i) {
       const base = `${IMAGE_PREFIX}${i}${IMAGE_EXT}`;
       return USE_CACHE_BUST ? `${base}?v=${Date.now()}` : base;
     }
 
-    function setPhoto(src) {
-      const img = document.getElementById('photo');
+    function nextIndex(i) {
+      return i >= TOTAL_IMAGES ? 1 : i + 1;
+    }
 
+    function setPhotoByIndex(i) {
+      const img = document.getElementById('photo');
       const pre = new Image();
+      const src = indexToSrc(i);
+
       pre.onload = () => {
         img.style.opacity = '0';
         requestAnimationFrame(() => {
@@ -160,20 +145,23 @@
         });
       };
       pre.onerror = () => {
-        // Skip missing file and move on
-        setPhoto(pickNextImage());
+        // If a file is missing, skip to the next index in ascending order
+        const next = nextIndex(i);
+        setPhotoByIndex(next);
       };
+
       pre.src = src;
     }
 
-    function setNextPhoto() {
-      setPhoto(pickNextImage());
+    function showCurrentPhotoAndAdvance() {
+      setPhotoByIndex(currentIndex);
+      currentIndex = nextIndex(currentIndex);
     }
 
     function startSlideshow() {
-      if (prefersReducedMotion) return;
+      if (prefersReducedMotion) return;  // static image, still random start
       stopSlideshow();
-      timerId = setInterval(setNextPhoto, INTERVAL_MS);
+      timerId = setInterval(showCurrentPhotoAndAdvance, INTERVAL_MS);
     }
 
     function stopSlideshow() {
@@ -221,11 +209,15 @@
     }
 
     // ---- Init ----
-    newOrder();       // prepare shuffled sequence
-    setNextPhoto();   // show first image
-    loadVerse();      // load random verse
-    startSlideshow(); // start cycling every 5s
+    // Random starting point each page load
+    function initRandomStartIndex() {
+      currentIndex = Math.floor(Math.random() * TOTAL_IMAGES) + 1;  // 1..TOTAL_IMAGES
+    }
+
+    initRandomStartIndex();        // pick random starting image
+    showCurrentPhotoAndAdvance();  // show it (and advance index for the next tick)
+    loadVerse();                   // load random verse
+    startSlideshow();              // start cycling every 5s
   </script>
 </body>
 </html>
-
