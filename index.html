@@ -33,23 +33,6 @@
       font-size: 1.1rem;
       color: #1e40af;
     }
-    header p {
-      margin: 0;
-      font-size: 1rem;
-      line-height: 1.35;
-      white-space: pre-wrap;
-    }
-    header .ref {
-      margin-top: 6px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #6b7280;
-    }
-    header .error {
-      margin-top: 6px;
-      color: #b91c1c;
-      font-size: 0.9rem;
-    }
 
     main {
       padding: 10px var(--pad) calc(env(safe-area-inset-bottom, 0px) + 18px);
@@ -80,21 +63,21 @@
       user-select: none;
       -webkit-user-drag: none;
       transition: opacity 300ms ease;
-      opacity: 0; /* fade in smoothly */
+      opacity: 0;
     }
 
-    .hint {
-      display: none;
-    }
-
-    @media (max-width: 380px) {
-      header h2 { font-size: 1rem; }
-      header p  { font-size: 0.95rem; }
-      header .ref { font-size: 0.9rem; }
+    /* ---- NEW STYLE FOR IMAGE LABEL ---- */
+    #imgLabel {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-top: 4px;
+      font-family: monospace;
+      user-select: none;
     }
   </style>
 </head>
 <body>
+
   <header>
     <h2>Today's Verse</h2>
     <p id="verse">Loading...</p>
@@ -106,21 +89,21 @@
     <figure class="frame" id="frame">
       <img id="photo" alt="Daily photo" loading="eager" decoding="async"/>
     </figure>
+
+    <!-- NEW: label showing current image name -->
+    <div id="imgLabel"></div>
   </main>
 
   <script>
-    // ---- Image Slideshow Config ----
-    const TOTAL_IMAGES = 18;              // image_1.jpg … image_18.jpg
-    const USE_CACHE_BUST = false;         // flip true if browser caches too hard
-    const INTERVAL_MS = 5000;             // change every 5 seconds
+    const TOTAL_IMAGES = 18;
+    const USE_CACHE_BUST = false;
+    const INTERVAL_MS = 5000;
     const IMAGE_PREFIX = 'image_';
-    const IMAGE_EXT = '.jpg';             // change if you use .png, etc.
+    const IMAGE_EXT = '.jpg';
 
-    // currentIndex always moves: 1 → 2 → … → TOTAL_IMAGES → 1 → …
     let currentIndex = 1;
     let timerId = null;
 
-    // Respect reduced motion settings
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function indexToSrc(i) {
@@ -130,6 +113,12 @@
 
     function nextIndex(i) {
       return i >= TOTAL_IMAGES ? 1 : i + 1;
+    }
+
+    // ---- UPDATE LABEL ----
+    function updateLabel(i) {
+      const label = document.getElementById("imgLabel");
+      label.textContent = `${IMAGE_PREFIX}${i}${IMAGE_EXT}`;
     }
 
     function setPhotoByIndex(i) {
@@ -144,8 +133,8 @@
           requestAnimationFrame(() => { img.style.opacity = '1'; });
         });
       };
+
       pre.onerror = () => {
-        // If a file is missing, skip to the next index in ascending order
         const next = nextIndex(i);
         setPhotoByIndex(next);
       };
@@ -155,69 +144,50 @@
 
     function showCurrentPhotoAndAdvance() {
       setPhotoByIndex(currentIndex);
+      updateLabel(currentIndex);   // <-- NEW: show filename
       currentIndex = nextIndex(currentIndex);
     }
 
     function startSlideshow() {
-      if (prefersReducedMotion) return;  // static image, still random start
+      if (prefersReducedMotion) return;
       stopSlideshow();
       timerId = setInterval(showCurrentPhotoAndAdvance, INTERVAL_MS);
     }
 
     function stopSlideshow() {
-      if (timerId !== null) {
-        clearInterval(timerId);
-        timerId = null;
-      }
+      if (timerId) clearInterval(timerId);
+      timerId = null;
     }
 
-    // Pause slideshow when page is hidden
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) stopSlideshow();
       else startSlideshow();
     });
 
-    // Refresh positioning on orientation change (mobile polish)
-    window.addEventListener('orientationchange', () => {
-      const img = document.getElementById('photo');
-      img.style.transform = 'translateZ(0)';
-      setTimeout(() => { img.style.transform = ''; }, 200);
-    });
-
-    // ---- Bible Verse Loader (OurManna API) ----
+    // ---- Bible Verse Loader ----
     async function loadVerse() {
-      const verseEl = document.getElementById("verse");
-      const refEl   = document.getElementById("reference");
-      const errEl   = document.getElementById("error");
-
       try {
         const url = "https://beta.ourmanna.com/api/v1/get/?format=json&order=random&t=" + Date.now();
         const res = await fetch(url);
-        if (!res.ok) throw new Error("Verse API error");
-
         const json = await res.json();
         const det = json.verse.details;
 
         verseEl.textContent = det.text;
-        refEl.textContent   = det.reference || "";
-        errEl.textContent   = "";
+        reference.textContent = det.reference;
       } catch (e) {
         verseEl.textContent = "⚠️ Unable to load verse.";
-        refEl.textContent = "";
-        errEl.textContent = "Please check your internet connection and try again.";
       }
     }
 
-    // ---- Init ----
-    // Random starting point each page load
     function initRandomStartIndex() {
-      currentIndex = Math.floor(Math.random() * TOTAL_IMAGES) + 1;  // 1..TOTAL_IMAGES
+      currentIndex = Math.floor(Math.random() * TOTAL_IMAGES) + 1;
     }
 
-    initRandomStartIndex();        // pick random starting image
-    showCurrentPhotoAndAdvance();  // show it (and advance index for the next tick)
-    loadVerse();                   // load random verse
-    startSlideshow();              // start cycling every 5s
+    // ---- Init ----
+    initRandomStartIndex();
+    showCurrentPhotoAndAdvance();
+    loadVerse();
+    startSlideshow();
   </script>
 </body>
 </html>
